@@ -1,0 +1,12 @@
+# Old/archived files
+.old/
+
+# Temporary files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Nix build results
+result
+result-*
