@@ -44,18 +44,33 @@ tmux bind-key -T prefix t run-shell "if [ \$(cat $AUTOPROMPT_STATE) = 'enabled' 
             continue
         fi
         
-        # Check if Claude is idle (no "esc to interrupt" in recent output)
-        output=$(tmux capture-pane -t claude-auto -p | tail -5)
+        # Get the entire screen to check Claude's state
+        output=$(tmux capture-pane -t claude-auto -p)
         
-        if ! echo "$output" | grep -q "esc to interrupt"; then
-            # Claude is idle, send autoprompt
-            if [[ -f "$AUTOPROMPT_FILE" ]]; then
-                autoprompt=$(cat "$AUTOPROMPT_FILE")
-                if [[ -n "$autoprompt" ]]; then
-                    echo "[AUTO-PROMPTING]: $autoprompt"
-                    tmux send-keys -t claude-auto "$autoprompt" Enter
-                    sleep 10  # Wait before next check
-                fi
+        # Check if Claude is currently working
+        if echo "$output" | grep -q "esc to interrupt"; then
+            # Claude is working, skip this cycle
+            continue
+        fi
+        
+        # Claude is not working, wait a bit more to be sure it's idle
+        sleep 2
+        output=$(tmux capture-pane -t claude-auto -p)
+        
+        # Double-check Claude is still not working
+        if echo "$output" | grep -q "esc to interrupt"; then
+            continue
+        fi
+        
+        # Claude is idle, send autoprompt
+        if [[ -f "$AUTOPROMPT_FILE" ]]; then
+            autoprompt=$(cat "$AUTOPROMPT_FILE" | tr -d '\n')  # Remove newlines
+            if [[ -n "$autoprompt" ]]; then
+                echo "[AUTO-PROMPTING]: $autoprompt"
+                # Don't use -l flag, let tmux interpret the text normally
+                tmux send-keys -t claude-auto "$autoprompt"
+                tmux send-keys -t claude-auto C-m  # Use C-m for Enter/Return
+                sleep 15  # Wait longer before next check
             fi
         fi
     done
